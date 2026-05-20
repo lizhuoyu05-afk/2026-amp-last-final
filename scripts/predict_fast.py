@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# 让脚本无论从哪里运行，都能找到项目根目录下的 src 包
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import argparse
 import glob
 import json
@@ -20,23 +27,29 @@ from src.modeling import LABEL_NAMES, load_model_for_inference
 
 
 class PredictCSVChunkDataset(Dataset):
-    def __init__(self, df: pd.DataFrame, seq_col: str = "Sequence", id_col: Optional[str] = "Hash", include_labels: bool = False):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        seq_col: str = "Sequence",
+        id_col: Optional[str] = "Hash",
+        include_labels: bool = False,
+    ):
         self.df = df.reset_index(drop=True).copy()
         self.seq_col = seq_col
         self.id_col = id_col if (id_col and id_col in self.df.columns) else None
 
         if self.seq_col not in self.df.columns:
-            raise ValueError(f"Missing sequence column: {self.seq_col}")
+            raise ValueError(
+                f"Missing sequence column: {self.seq_col}. "
+                f"Available columns: {list(self.df.columns)}"
+            )
 
         self.has_labels = include_labels and all(c in self.df.columns for c in LABEL_COLS)
 
-        # Keep original row order inside this chunk for later restore
         self.df["_orig_order"] = np.arange(len(self.df), dtype=np.int64)
-        # Precompute sequence lengths for sorting/bucketing
         self.df["_seq_len"] = self.df[self.seq_col].astype(str).str.len().astype(np.int32)
 
     def sort_by_length(self):
-        # Stable sort preserves order among equal lengths
         self.df = self.df.sort_values("_seq_len", kind="mergesort").reset_index(drop=True)
 
     def __len__(self) -> int:
@@ -44,8 +57,9 @@ class PredictCSVChunkDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict:
         row = self.df.iloc[idx]
-        seq = str(row[self.seq_col])
-        if seq == "nan":
+        seq = str(row[self.seq_col]).strip().upper()
+
+        if seq.lower() == "nan":
             seq = ""
 
         if self.id_col is not None:
@@ -73,6 +87,7 @@ class PredictCollator:
 
     def __call__(self, features: List[Dict]) -> Dict:
         sequences = [f["sequence"] for f in features]
+
         enc = self.tokenizer(
             sequences,
             padding=True,
@@ -80,17 +95,30 @@ class PredictCollator:
             max_length=self.max_length,
             return_tensors="pt",
         )
+
         enc["seq_id"] = [f["seq_id"] for f in features]
-        enc["orig_order"] = torch.tensor([f["orig_order"] for f in features], dtype=torch.long)
-        enc["seq_len"] = torch.tensor([f["seq_len"] for f in features], dtype=torch.int32)
+        enc["orig_order"] = torch.tensor(
+            [f["orig_order"] for f in features],
+            dtype=torch.long,
+        )
+        enc["seq_len"] = torch.tensor(
+            [f["seq_len"] for f in features],
+            dtype=torch.int32,
+        )
+
         if "labels" in features[0]:
-            enc["labels"] = torch.tensor([f["labels"] for f in features], dtype=torch.float32)
+            enc["labels"] = torch.tensor(
+                [f["labels"] for f in features],
+                dtype=torch.float32,
+            )
+
         return enc
 
 
 def amp_ctx(device: torch.device, amp: str):
     if device.type != "cuda" or amp == "none":
         return nullcontext()
+
     dtype = torch.float16 if amp == "fp16" else torch.bfloat16
     return torch.autocast(device_type="cuda", dtype=dtype)
 
@@ -98,23 +126,28 @@ def amp_ctx(device: torch.device, amp: str):
 def resolve_input_csv(args) -> str:
     if args.in_csv:
         return args.in_csv
+
     if args.data_dir and args.csv:
         return os.path.join(args.data_dir, args.csv)
+
     raise ValueError("Provide either --in_csv OR (--data_dir and --csv).")
 
 
 def merge_chunk_csvs(chunks_dir: str, out_csv: str) -> int:
     files = sorted(glob.glob(os.path.join(chunks_dir, "chunk_*.csv")))
+
     if not files:
         raise FileNotFoundError(f"No chunk csv files found in {chunks_dir}")
 
     os.makedirs(os.path.dirname(out_csv) or ".", exist_ok=True)
+
     with open(out_csv, "wb") as fout:
         for i, fp in enumerate(files):
             with open(fp, "rb") as fin:
                 if i > 0:
-                    fin.readline()  # skip header
+                    fin.readline()
                 shutil.copyfileobj(fin, fout)
+
     return len(files)
 
 
@@ -134,6 +167,7 @@ def run_one_chunk(
         id_col=args.id_col,
         include_labels=bool(args.include_labels),
     )
+
     if bool(args.sort_by_len):
         ds.sort_by_length()
 
@@ -146,8 +180,10 @@ def run_one_chunk(
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )
+
     if args.num_workers > 0:
         dl_kwargs["persistent_workers"] = True
+
     dl = DataLoader(ds, **dl_kwargs)
 
     all_probs = []
@@ -157,6 +193,7 @@ def run_one_chunk(
     all_labels = [] if ds.has_labels else None
 
     t0 = time.perf_counter()
+
     for batch in tqdm(dl, desc=f"chunk {chunk_idx:04d}", leave=False):
         input_ids = batch["input_ids"].to(device, non_blocking=True)
         attention_mask = batch["attention_mask"].to(device, non_blocking=True)
@@ -165,6 +202,7 @@ def run_one_chunk(
             out = model(input_ids=input_ids, attention_mask=attention_mask)
 
         probs = torch.sigmoid(out["logits"]).detach().float().cpu().numpy()
+
         all_probs.append(probs)
         all_ids.extend(batch["seq_id"])
         all_orig.append(batch["orig_order"].cpu().numpy())
@@ -186,11 +224,13 @@ def run_one_chunk(
             "seq_len": seq_len,
         }
     )
+
     for i, name in enumerate(LABEL_NAMES):
         out_df[f"p_{name}"] = probs[:, i]
 
-    if args.thr_any is not None:
-        out_df["pred_any"] = (out_df["p_Antimicrobial"] >= float(args.thr_any)).astype(int)
+    if args.thr_any is not None and len(LABEL_NAMES) == 1:
+        prob_col = f"p_{LABEL_NAMES[0]}"
+        out_df["pred_any"] = (out_df[prob_col] >= float(args.thr_any)).astype(int)
 
     if bool(args.include_labels) and all_labels is not None and len(all_labels) > 0:
         labels = np.concatenate(all_labels, axis=0)
@@ -198,14 +238,20 @@ def run_one_chunk(
             out_df[f"y_{name}"] = labels[:, i]
 
     if bool(args.include_seq):
-        seq_map = {int(r["_orig_order"]): str(r[args.seq_col]) for _, r in ds.df.iterrows()}
-        out_df["Sequence"] = [seq_map[int(i)] for i in out_df["_orig_order"].tolist()]
+        seq_map = {
+            int(r["_orig_order"]): str(r[args.seq_col])
+            for _, r in ds.df.iterrows()
+        }
+        out_df["Sequence"] = [
+            seq_map[int(i)]
+            for i in out_df["_orig_order"].tolist()
+        ]
 
-    # Restore original order within this chunk
     out_df = out_df.sort_values("_orig_order", kind="mergesort").reset_index(drop=True)
     out_df.to_csv(chunk_csv_path, index=False)
 
     n = len(out_df)
+
     return {
         "rows": int(n),
         "infer_sec": float(infer_sec),
@@ -233,7 +279,7 @@ def main():
 
     # Perf
     ap.add_argument("--batch_size", type=int, default=64)
-    ap.add_argument("--num_workers", type=int, default=4)
+    ap.add_argument("--num_workers", type=int, default=0)
     ap.add_argument("--amp", choices=["none", "fp16", "bf16"], default="fp16")
     ap.add_argument("--sort_by_len", type=int, default=1)
 
@@ -253,14 +299,23 @@ def main():
     args = ap.parse_args()
 
     in_csv = resolve_input_csv(args)
+
     if not os.path.isfile(in_csv):
-        raise FileNotFoundError(in_csv)
+        raise FileNotFoundError(f"Input CSV not found: {in_csv}")
+
+    if not os.path.isdir(args.ckpt_dir):
+        raise FileNotFoundError(f"Checkpoint directory not found: {args.ckpt_dir}")
 
     os.makedirs(os.path.dirname(args.pred_out) or ".", exist_ok=True)
+
+    if args.summary_out:
+        os.makedirs(os.path.dirname(args.summary_out) or ".", exist_ok=True)
+
     chunks_dir = args.chunks_dir or (args.pred_out + ".chunks")
     os.makedirs(chunks_dir, exist_ok=True)
 
     device = torch.device(args.device)
+
     if device.type == "cuda":
         torch.backends.cuda.matmul.allow_tf32 = True
         if hasattr(torch, "set_float32_matmul_precision"):
@@ -268,12 +323,26 @@ def main():
 
     t_all0 = time.perf_counter()
 
-    tokenizer = load_tokenizer(args.ckpt_dir)
+    tokenizer_source = args.base_model_dir or args.ckpt_dir
+    print(f"[info] input_csv        = {in_csv}")
+    print(f"[info] ckpt_dir         = {args.ckpt_dir}")
+    print(f"[info] base_model_dir   = {args.base_model_dir}")
+    print(f"[info] tokenizer_source = {tokenizer_source}")
+    print(f"[info] pred_out         = {args.pred_out}")
+    print(f"[info] chunks_dir       = {chunks_dir}")
+    print(f"[info] device           = {device}")
+    print(f"[info] batch_size       = {args.batch_size}")
+    print(f"[info] chunk_size       = {args.chunk_size}")
+    print(f"[info] amp              = {args.amp}")
+
+    tokenizer = load_tokenizer(tokenizer_source)
+
     model = load_model_for_inference(
         args.ckpt_dir,
         base_model_dir=args.base_model_dir,
         merge_lora=bool(args.merge_lora),
     ).to(device)
+
     model.eval()
 
     total_rows = 0
@@ -281,13 +350,20 @@ def main():
     chunk_infos = []
 
     reader = pd.read_csv(in_csv, chunksize=args.chunk_size)
+
     for chunk_idx, df_chunk in enumerate(reader):
         chunk_csv_path = os.path.join(chunks_dir, f"chunk_{chunk_idx:06d}.csv")
 
         if bool(args.resume) and os.path.isfile(chunk_csv_path) and os.path.getsize(chunk_csv_path) > 0:
             rows = len(df_chunk)
             total_rows += rows
-            chunk_infos.append({"chunk_idx": chunk_idx, "rows": rows, "skipped": True})
+            chunk_infos.append(
+                {
+                    "chunk_idx": chunk_idx,
+                    "rows": rows,
+                    "skipped": True,
+                }
+            )
             print(f"[resume] skip chunk {chunk_idx:04d} ({rows} rows)")
             continue
 
@@ -300,12 +376,22 @@ def main():
             device=device,
             chunk_csv_path=chunk_csv_path,
         )
+
         total_rows += info["rows"]
         total_infer_sec += info["infer_sec"]
-        chunk_infos.append({"chunk_idx": chunk_idx, "skipped": False, **info})
+
+        chunk_infos.append(
+            {
+                "chunk_idx": chunk_idx,
+                "skipped": False,
+                **info,
+            }
+        )
+
         print(
             f"[chunk {chunk_idx:04d}] rows={info['rows']} "
-            f"infer={info['infer_sec']:.2f}s rps={info['rows_per_sec_infer']:.1f}"
+            f"infer={info['infer_sec']:.2f}s "
+            f"rps={info['rows_per_sec_infer']:.1f}"
         )
 
     num_chunk_files = merge_chunk_csvs(chunks_dir, args.pred_out)
@@ -322,6 +408,11 @@ def main():
         "rows_per_sec_infer": float(total_rows / total_infer_sec) if total_infer_sec > 0 else None,
         "rows_per_sec_wall": float(total_rows / total_wall_sec) if total_wall_sec > 0 else None,
         "config": {
+            "seq_col": args.seq_col,
+            "id_col": args.id_col,
+            "ckpt_dir": args.ckpt_dir,
+            "base_model_dir": args.base_model_dir,
+            "tokenizer_source": tokenizer_source,
             "batch_size": int(args.batch_size),
             "num_workers": int(args.num_workers),
             "amp": args.amp,
@@ -329,12 +420,14 @@ def main():
             "chunk_size": int(args.chunk_size),
             "max_len": int(args.max_len),
             "device": str(device),
+            "include_seq": bool(args.include_seq),
+            "include_labels": bool(args.include_labels),
+            "thr_any": args.thr_any,
         },
         "chunks": chunk_infos,
     }
 
     if args.summary_out:
-        os.makedirs(os.path.dirname(args.summary_out) or ".", exist_ok=True)
         with open(args.summary_out, "w", encoding="utf-8") as f:
             json.dump(summary, f, ensure_ascii=False, indent=2)
 

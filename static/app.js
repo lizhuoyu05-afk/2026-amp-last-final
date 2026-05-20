@@ -77,7 +77,7 @@ predictBtn.addEventListener('click', async () => {
     return;
   }
 
-  statusText.textContent = '正在连接远程服务器并预测...';
+  statusText.textContent = '正在本地模型中预测...';
   predictBtn.disabled = true;
 
   try {
@@ -131,15 +131,8 @@ batchBtn.addEventListener('click', async () => {
     renderBatchTable(latestBatchResults);
     downloadBtn.disabled = latestBatchResults.length === 0;
 
-<<<<<<< ours
-<<<<<<< ours
-    batchSummaryEl.textContent = `批量结果：总计 ${data.total}，成功 ${data.success}，失败 ${data.failed}（识别列：${data.sequence_column}）`;
-=======
-    batchSummaryEl.textContent = `批量结果：总计 ${data.total}，成功 ${data.success}，失败 ${data.failed}（识别列：${data.sequence_column}，按概率降序展示）`;
->>>>>>> theirs
-=======
-    batchSummaryEl.textContent = `批量结果：总计 ${data.total}，成功 ${data.success}，失败 ${data.failed}（识别列：${data.sequence_column}，按概率降序展示）`;
->>>>>>> theirs
+    batchSummaryEl.textContent =
+      `批量结果：总计 ${data.total}，成功 ${data.success}，失败 ${data.failed}（识别列：${data.sequence_column}，按概率降序展示）`;
     statusText.textContent = '批量预测完成。';
   } catch (err) {
     statusText.textContent = `批量错误：${err.message}`;

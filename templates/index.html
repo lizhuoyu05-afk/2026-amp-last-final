@@ -16,35 +16,21 @@
     <main class="grid">
       <section class="panel">
         <h2>单条预测</h2>
-<<<<<<< ours
 
-        <textarea id="sequence" placeholder="例如: GIGAVLKVLTTGLPALIS"></textarea>
+        <textarea id="sequence" placeholder="例如: GIGAVLKVLTTGLPALISWIKRKRQQ"></textarea>
 
         <div class="chips">
           <span>长度 <b id="seqLen">0 aa</b></span>
           <span>
             模型
-            <b>
-              {% if infer_mode == "local" %}
-              local model
-              {% else %}
-              remote API
-              {% endif %}
-            </b>
+            <b>{% if infer_mode == "local" %}local model{% else %}remote API{% endif %}</b>
           </span>
-=======
-        <textarea id="sequence" placeholder="例如: GIGAVLKVLTTGLPALIS&#10;WIKRKRQQ"></textarea>
-
-        <div class="chips">
-          <span>长度 <b id="seqLen">0 aa</b></span>
-          <span>模型 <b>{% if infer_mode == "local" %}local model{% else %}remote API{% endif %}</b></span>
->>>>>>> theirs
           <span>阈值 <b>0.59</b></span>
         </div>
 
         <div class="actions">
-          <button id="predictBtn">开始预测</button>
-          <button id="clearBtn" class="ghost">清空</button>
+          <button id="predictBtn" type="button">开始预测</button>
+          <button id="clearBtn" type="button" class="ghost">清空</button>
         </div>
 
         <div class="csv-block">
@@ -52,8 +38,8 @@
           <p class="hint">上传 CSV（支持列名：Sequence / sequence / seq / peptide）</p>
           <div class="actions">
             <input id="csvFile" type="file" accept=".csv" />
-            <button id="batchBtn">上传并批量预测</button>
-            <button id="downloadBtn" class="ghost" disabled>下载结果 CSV</button>
+            <button id="batchBtn" type="button">上传并批量预测</button>
+            <button id="downloadBtn" type="button" class="ghost" disabled>下载结果 CSV</button>
           </div>
         </div>
 
@@ -81,18 +67,7 @@
 
         <ul class="notes">
           <li>输出：概率 + 二分类标签</li>
-<<<<<<< ours
-          <li>
-            流程：
-            {% if infer_mode == "local" %}
-            前端 → Flask → 本地模型推理
-            {% else %}
-            前端 → Flask 代理 → 远程推理服务
-            {% endif %}
-          </li>
-=======
           <li>流程：前端 → Flask → 本地模型（可切 remote）</li>
->>>>>>> theirs
           <li>阈值：0.59（可在后端配置）</li>
         </ul>
 

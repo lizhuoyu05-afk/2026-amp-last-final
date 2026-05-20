@@ -1,0 +1,114 @@
+{
+  "input_csv": "D:\\26大创\\home\\2026-amp-last\\data\\MiSM_NCBI_Complete_Draft_Merge_5_20aa_rmdup_peptides-1.csv",
+  "pred_out": "D:\\26大创\\home\\2026-amp-last\\outputs\\mism_200k_pred.csv",
+  "chunks_dir": "D:\\26大创\\home\\2026-amp-last\\outputs\\mism_200k_pred.csv.chunks",
+  "num_chunks_merged": 12,
+  "total_rows": 222653,
+  "total_infer_sec": 4098.085151799998,
+  "total_wall_sec": 4109.5170239,
+  "rows_per_sec_infer": 54.33098428962715,
+  "rows_per_sec_wall": 54.179846124277304,
+  "config": {
+    "seq_col": "Sequence",
+    "id_col": "Hash",
+    "ckpt_dir": "D:\\26大创\\home\\2026-amp-last\\runs\\cytotox_student_35m\\best",
+    "base_model_dir": "C:\\Users\\周游\\.cache\\huggingface\\hub\\models--facebook--esm2_t12_35M_UR50D\\snapshots\\6fbf070e65b0b7291e7bbcd451118c216cff79d8",
+    "tokenizer_source": "C:\\Users\\周游\\.cache\\huggingface\\hub\\models--facebook--esm2_t12_35M_UR50D\\snapshots\\6fbf070e65b0b7291e7bbcd451118c216cff79d8",
+    "batch_size": 8,
+    "num_workers": 0,
+    "amp": "fp16",
+    "sort_by_len": true,
+    "chunk_size": 20000,
+    "max_len": 256,
+    "device": "cpu",
+    "include_seq": true,
+    "include_labels": false,
+    "thr_any": 0.59
+  },
+  "chunks": [
+    {
+      "chunk_idx": 0,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 413.5442137,
+      "rows_per_sec_infer": 48.3624225353295
+    },
+    {
+      "chunk_idx": 1,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 314.1268323,
+      "rows_per_sec_infer": 63.668550227187964
+    },
+    {
+      "chunk_idx": 2,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 493.11242259999995,
+      "rows_per_sec_infer": 40.55870240410366
+    },
+    {
+      "chunk_idx": 3,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 576.7184158,
+      "rows_per_sec_infer": 34.67896889031508
+    },
+    {
+      "chunk_idx": 4,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 354.6725845000001,
+      "rows_per_sec_infer": 56.39003654087054
+    },
+    {
+      "chunk_idx": 5,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 315.4244193999998,
+      "rows_per_sec_infer": 63.40663173144296
+    },
+    {
+      "chunk_idx": 6,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 326.0166670999997,
+      "rows_per_sec_infer": 61.34655684295233
+    },
+    {
+      "chunk_idx": 7,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 310.0379850999998,
+      "rows_per_sec_infer": 64.50822467301609
+    },
+    {
+      "chunk_idx": 8,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 322.0652725,
+      "rows_per_sec_infer": 62.09921313388422
+    },
+    {
+      "chunk_idx": 9,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 309.40448849999984,
+      "rows_per_sec_infer": 64.64030336780331
+    },
+    {
+      "chunk_idx": 10,
+      "skipped": false,
+      "rows": 20000,
+      "infer_sec": 322.7444860999999,
+      "rows_per_sec_infer": 61.96852575756524
+    },
+    {
+      "chunk_idx": 11,
+      "skipped": false,
+      "rows": 2653,
+      "infer_sec": 40.21736419999979,
+      "rows_per_sec_infer": 65.96653094436293
+    }
+  ]
+}
